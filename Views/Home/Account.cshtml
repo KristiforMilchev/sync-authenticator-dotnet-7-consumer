@@ -1,0 +1,27 @@
+@{
+    ViewData["Title"] = "Account Page";
+
+    Layout = "_Layout";
+}
+
+<div class="d-flex align-items-stretch button-group mt-4 pt-2" style="width: 100%">
+    <button type="submit" onclick="EnableAccountTwoFactor()" class="btn btn-info btn-lg px-4" style="width: 100%">Enable Two Factor authentication</button>
+</div>
+<div style="display: flex;align-items: center;justify-content: center; padding: 20px;" id="qrcode"></div>
+
+
+
+<script src="~/js/qr/qrcode.min.js"></script>
+<script>
+function EnableAccountTwoFactor()
+{
+    $.ajax({
+        method: "Get",
+        contentType: "application/json",
+        url: "/Home/EnableTwoFa",
+
+    }).done(function (msg) {
+        new QRCode(document.getElementById("qrcode"), msg);
+    });
+}
+</script>
