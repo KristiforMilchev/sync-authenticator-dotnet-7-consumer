@@ -28,12 +28,25 @@ public class HomeController : Controller
         return View();
     }
     
+    public IActionResult Confirm()
+    {
+        var account = Authentication.IsAuthenticated(User);
+
+        ViewData["FullAddress"] = account;
+
+        return View();
+    }
+    
     public IActionResult Account()
     {
         var account = Authentication.IsAuthenticated(User);
         if(string.IsNullOrEmpty(account))
             return Redirect("/home/Error");
- 
+
+
+        var dbContext = new DatabaseContext();
+        var current = dbContext.Single(account);
+        ViewData["2faEnabled"] = current.IsTwoFactorEnabled;
         ViewData["FullAddress"] = account;
 
         return View();
@@ -73,15 +86,35 @@ public class HomeController : Controller
         {
             url =$"http://{url}",
             email = exist,
-            message = "Hello World"
+            message = Authentication.GenerateSignatureRequest()
         });
     }
     
     [HttpGet]
     public async Task<bool> DisconnectSession()
     {
+        var user = Authentication.IsAuthenticated(User);
+        var exists = Utilities.ExpectingTwoFactorSignature.FirstOrDefault(x=> x.Account.Email == user);
+        if (exists != null)
+            Utilities.ExpectingTwoFactorSignature.Remove(exists);
+        
         return await Authentication.Disconnect(HttpContext);
     }
+    
+    [HttpGet]
+    public async Task<bool> CheckConfirmed()
+    {
+        var exist = Authentication.IsPending(User);
+        if (string.IsNullOrEmpty(exist))
+            return false;
+        
+        var dbContext = new DatabaseContext();
+        var user = dbContext.Single(exist);
+        
+        return await Authentication.CheckConfirmed(HttpContext, User, user);
+    }
+
+    
     
     [HttpPost]
     public async Task<AuthRespose> Login([FromBody] RegisterDto dto)
@@ -144,6 +177,18 @@ public class HomeController : Controller
         var result = Authentication.PairTwoFactor(account.Email, dto.Message, dto.Signed);
         await DisconnectSession();
         return true;
+    }
+    
+       
+    [HttpPost]
+    public async Task<bool> SignTwoFactor([FromBody] TwoFactorRequest dto)
+    {
+        var account = Utilities.ExpectingTwoFactorSignature.FirstOrDefault(x => x.Account.Email == dto.Email);
+        if (account == null)
+            return false;
+        
+
+        return await Authentication.SignTwoFactor(dto);
     }
     
     [ResponseCache(Duration = 0, Location = ResponseCacheLocation.None, NoStore = true)]

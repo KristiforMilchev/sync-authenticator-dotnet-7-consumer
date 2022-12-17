@@ -5,7 +5,7 @@ namespace LoginSample.Handlers.Implementation;
 public class Utilities
 {
     public static List<Account> RequestedTwoFactorPairs { get; set; } = new List<Account>();
-    public static List<Account> ExpectingTwoFactorSignature { get; set; } = new List<Account>();
+    public static List<TwoFactorConfirmation> ExpectingTwoFactorSignature { get; set; } = new List<TwoFactorConfirmation>();
     public static string GetOsSavePath()
     {
         var result = string.Empty;

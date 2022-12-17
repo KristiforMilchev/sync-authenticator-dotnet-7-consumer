@@ -1,10 +1,11 @@
 using System.Security.Claims;
+using System.Text;
 using LoginSample.Models;
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Mvc;
+using Nethereum.Hex.HexConvertors.Extensions;
 using Nethereum.Signer;
-using Nethereum.Web3;
+
 
 namespace LoginSample.Handlers.Implementation;
 
@@ -12,57 +13,29 @@ public class Authentication : IAuthentication
 {
     public async Task<bool> Authenticate(ClaimsPrincipal User, HttpContext httpContext, Account account)
     {
-        if (!account.IsTwoFactorEnabled)
+        //Save vital login detail for later authenication 
+        var identity = new ClaimsIdentity(CookieAuthenticationDefaults.AuthenticationScheme, ClaimTypes.Name,
+            ClaimTypes.Role);
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()));
+        identity.AddClaim(new Claim(ClaimTypes.Name, account.Email));
+        var result = false;
+        if (account.IsTwoFactorEnabled)
         {
-                     
-            //Save vital login detail for later authenication 
-            var identity = new ClaimsIdentity(CookieAuthenticationDefaults.AuthenticationScheme, ClaimTypes.Name, ClaimTypes.Role);
-            identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()));
-            identity.AddClaim(new Claim(ClaimTypes.Name, account.Email));
-
-         
-
-            //Register the principal and authorize the user to use the system.
-            var principal = new ClaimsPrincipal(identity);
-            var authProperties = new AuthenticationProperties
+            Utilities.ExpectingTwoFactorSignature.Add(new TwoFactorConfirmation
             {
-                AllowRefresh = true,
-                ExpiresUtc = DateTimeOffset.Now.AddDays(1),
-                IsPersistent = true,
-            };
+                Account = account,
+                Confirmed = false
 
-            await httpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(principal), authProperties);
-            return false;
+            });
+            result = true;
+            identity.AddClaim(new Claim(ClaimTypes.Name, "0"));
+
         }
         else
         {
-            Utilities.ExpectingTwoFactorSignature.Add(new Account
-            {
-                Email = account.Email,
-                
-            });
-            return true;
-        }
-    }
+            identity.AddClaim(new Claim(ClaimTypes.Name, "1"));
 
-    public async Task<bool> SignTwoFactor(TwoFactorRequest request, HttpContext httpContent, ClaimsPrincipal user)
-    {
-        var existingUser = Utilities.ExpectingTwoFactorSignature.FirstOrDefault(x => x.Email == request.Email);
-        if (existingUser == null)
-            return false;
-        
-        var signer = new EthereumMessageSigner();
-        var verify = signer.EncodeUTF8AndEcRecover(request.Message, request.Signed);
-        
-        // //Verify that the requester owns the account.
-        if (verify != existingUser.TwoFactorKey)
-            return false;
-             
-        var identity = new ClaimsIdentity(CookieAuthenticationDefaults.AuthenticationScheme, ClaimTypes.Name, ClaimTypes.Role);
-        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()));
-        identity.AddClaim(new Claim(ClaimTypes.Name, existingUser.Email));
- 
-             
+        }
 
         //Register the principal and authorize the user to use the system.
         var principal = new ClaimsPrincipal(identity);
@@ -73,17 +46,67 @@ public class Authentication : IAuthentication
             IsPersistent = true,
         };
 
-        await httpContent.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(principal), authProperties);
+        await httpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(principal),
+            authProperties);
+        return result;
+    }
+
+    public async Task<bool> SignTwoFactor(TwoFactorRequest request)
+    {
+        var existingUser = Utilities.ExpectingTwoFactorSignature.FirstOrDefault(x => x.Account.Email == request.Email);
+        if (existingUser == null)
+            return false;
+
+         var signer = new EthereumMessageSigner();
+
+         
+         var verify = signer.EncodeUTF8AndEcRecover(request.Message, request.Signed);
+         //var verify = signer.EncodeUTF8AndEcRecover(request.Message, request.Signed);
+        
+        // //Verify that the requester owns the account.
+         if (verify != existingUser.Account.TwoFactorKey)
+             return false;
+
+        Utilities.ExpectingTwoFactorSignature.FirstOrDefault(x => x.Account.Email == request.Email).Confirmed = true;
+        return true;
+    }
+
+    public async Task<bool> CheckConfirmed(HttpContext httpContent, ClaimsPrincipal user, Account account)
+    {
+        if (!Utilities.ExpectingTwoFactorSignature.FirstOrDefault(x => x.Account.Email == account.Email)!.Confirmed)
+            return false;
+        
+        var result = await Disconnect(httpContent);
+
+        //Save vital login detail for later authentication 
+        var identity = new ClaimsIdentity(CookieAuthenticationDefaults.AuthenticationScheme, ClaimTypes.Name,
+            ClaimTypes.Role);
+        identity.AddClaim(new Claim(ClaimTypes.NameIdentifier, Guid.NewGuid().ToString()));
+        identity.AddClaim(new Claim(ClaimTypes.Name, account.Email));
+        identity.AddClaim(new Claim(ClaimTypes.Name, "1"));
+
+        //Register the principal and authorize the user to use the system.
+        var principal = new ClaimsPrincipal(identity);
+        var authProperties = new AuthenticationProperties
+        {
+            AllowRefresh = true,
+            ExpiresUtc = DateTimeOffset.Now.AddDays(1),
+            IsPersistent = true,
+        };
+
+        await httpContent.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, new ClaimsPrincipal(principal),
+            authProperties);
         return true;
     }
 
     public bool PairTwoFactor(string email, string message, string signature)
     {
-        var twoFaPairRequested= Utilities.RequestedTwoFactorPairs.FirstOrDefault(x=> x.Email == email);
+        var twoFaPairRequested = Utilities.RequestedTwoFactorPairs.FirstOrDefault(x => x.Email == email);
         if (twoFaPairRequested == null)
             return false;
-        
+
         var signer = new EthereumMessageSigner();
+  
         var verify = signer.EncodeUTF8AndEcRecover(message, signature);
         var dbContext = new DatabaseContext();
         var getUser = dbContext.Single(email);
@@ -105,17 +128,25 @@ public class Authentication : IAuthentication
 
     public string GenerateSignatureRequest()
     {
-        return $"Signature request: {Guid.NewGuid().ToString()}"; // Generates a message to be signed by web3 account.
+        // Generates a message to be signed by web3 account.
+        return Guid.NewGuid().ToString().Replace("-","");
     }
 
     public string IsAuthenticated(ClaimsPrincipal user)
     {
         if (user.Claims.FirstOrDefault() == null)
-            return null;
+            return String.Empty;
 
-        return user.Claims.ElementAt(1).Value;
-         
+        return user.Claims.ElementAt(2).Value == "0" ? string.Empty : user.Claims.ElementAt(1).Value;
     }
 
-        
+    public string IsPending(ClaimsPrincipal user)
+    {
+        if (user.Claims.FirstOrDefault() == null)
+            return String.Empty;
+
+        return user.Claims.ElementAt(1).Value;
+    }
+
+
 }
