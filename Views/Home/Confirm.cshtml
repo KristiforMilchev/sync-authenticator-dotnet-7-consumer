@@ -1,0 +1,37 @@
+@{
+    ViewBag.Title = "title";
+    Layout = "_Layout";
+}
+
+<div style="display: flex;align-items: center;justify-content: center; padding: 20px;">
+    <h2>
+        Waiting for 2FA confirmation
+    </h2>
+</div>
+
+
+<script>
+
+startConfirmCheck();
+function  startConfirmCheck()
+{
+    setTimeout(() => {
+      attemptConfirm()
+    }, 1000)
+
+}
+
+function attemptConfirm()
+{
+    $.ajax({
+        method: "GET",
+        contentType: "application/json",
+        url: "/Home/CheckConfirmed",
+    }).done(async function (session) {
+        if (session)
+            window.location.href = "/home/account";
+        else 
+            startConfirmCheck();
+    });
+}
+</script>
