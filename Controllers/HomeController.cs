@@ -28,6 +28,11 @@ public class HomeController : Controller
         return View();
     }
     
+    
+    public IActionResult Documentation() =>  View();
+ 
+
+    
     public IActionResult Confirm()
     {
         var account = Authentication.IsAuthenticated(User);
@@ -84,7 +89,7 @@ public class HomeController : Controller
         var url =  location.Authority;
         return JsonConvert.SerializeObject(new TwoFaRegisterCode
         {
-            url =$"http://{url}",
+            url =$"https://{url}",
             email = exist,
             message = Authentication.GenerateSignatureRequest()
         });
@@ -123,7 +128,7 @@ public class HomeController : Controller
         var exists = dbContext.Single(dto.Email);
         var userLogged = Authentication.IsAuthenticated(User);
         
-        if (exists == null)
+        if (exists == null || exists.Email != dto.Email && exists.Password != dto.Password)
             return new AuthRespose
             {
                 AccountFound = false,

@@ -7,16 +7,44 @@
 
 @if (!isConfigured.Value)
 {
-    <div class="d-flex align-items-stretch button-group mt-4 pt-2" style="width: 100%">
-        <button type="submit" onclick="EnableAccountTwoFactor()" class="btn btn-info btn-lg px-4" style="width: 100%">Enable Two Factor authentication</button>
+   
+    <div class="col-lg-8 col-xl-9 d-flex align-items-center justify-content-center">
+        <div class="row justify-content-center w-100 mt-4 mt-lg-0">
+            <div class="col-lg-6 col-xl-3 col-md-7">
+                <div class="card">
+                    <div class="d-flex align-items-stretch button-group mt-4 pt-2" style="width: 100%">
+                        <button type="submit" onclick="Disconnect()" class="btn btn-info btn-lg px-4" style="width: 100%">Log out</button>
+                    </div>
+                    <div class="d-flex align-items-stretch button-group mt-4 pt-2" style="width: 100%">
+                        <button type="submit" onclick="EnableAccountTwoFactor()" class="btn btn-info btn-lg px-4" style="width: 100%">Enable Two Factor authentication</button>
+                    </div>
+                    <div style="display: flex;align-items: center;justify-content: center; padding: 20px;" id="qrcode"></div>
+                </div>
+            </div>
+        </div>
     </div>
-    <div style="display: flex;align-items: center;justify-content: center; padding: 20px;" id="qrcode"></div>
+
+  
 }
 else
 {
-    <div style="display: flex;align-items: center;justify-content: center; padding: 20px;">
-        2FA approved, authenticated.
+    
+   
+    <div class="col-lg-8 col-xl-9 d-flex align-items-center justify-content-center">
+        <div class="row justify-content-center w-100 mt-4 mt-lg-0">
+            <div class="col-lg-6 col-xl-3 col-md-7">
+                <div class="card">
+                    <div class="d-flex align-items-stretch button-group mt-4 pt-2" style="width: 100%">
+                        <button type="submit" onclick="Disconnect()" class="btn btn-info btn-lg px-4" style="width: 100%">Log out</button>
+                    </div>
+                    <div style="display: flex;align-items: center;justify-content: center; padding: 20px;">
+                        2FA approved, authenticated.
+                    </div>
+                </div>
+            </div>
+        </div>
     </div>
+   
 
 }
 

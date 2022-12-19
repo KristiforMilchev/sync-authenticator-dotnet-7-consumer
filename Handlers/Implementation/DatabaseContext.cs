@@ -9,8 +9,8 @@ public class DatabaseContext
 
     public DatabaseContext()
     {
-        var dbPath = Path.Combine(Utilities.GetOsSavePath(), "accounts.db");
-        _database = new SQLiteConnection(dbPath);
+
+        _database = new SQLiteConnection("accounts.db");
         _database.CreateTable<Account>();
     }
     
